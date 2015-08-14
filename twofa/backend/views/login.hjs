@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{ strings.appTitle }}</title>
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+  </head>
+  <body>
+    <div id="topbar">
+    </div>
+    <div id="content">
+        <form action="/login" method="post">
+            <input type="text" name="username" placeholder="{{ strings.username }}">
+            <input type="password" name="password" placeholer="{{ strings.password }}">
+            <input type="submit">
+        </form>
+    </div>
+  </body>
+</html>
+
+

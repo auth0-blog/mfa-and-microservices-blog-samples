@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{ strings.appTitle }}</title>
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+  </head>
+  <body>
+    <div id="topbar">
+    </div>
+    <div id="content">
+        <h3>{{ strings.enterCode }}</h3>
+        <form action="/totp-input" method="post">
+            <input type="password" name="code" placeholer="{{ strings.enterCode }}">
+            <input type="submit">
+        </form>
+    </div>
+  </body>
+</html>
+
+

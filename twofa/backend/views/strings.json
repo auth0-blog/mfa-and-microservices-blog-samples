@@ -1,0 +1,10 @@
+{
+    "appTitle": "TOTP Test",
+    "username": "Username",
+    "password": "Password",
+    "enterCode": "Generated Code",
+    "qrSetupSteps": "Scan this code with Google Authenticator",
+    "welcome": "Welcome",
+    "enableTotp": "Enable TOTP"
+}
+
