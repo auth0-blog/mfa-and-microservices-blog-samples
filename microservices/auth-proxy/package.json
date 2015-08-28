@@ -1,0 +1,15 @@
+{
+  "name": "auth-proxy",
+  "version": "1.0.0",
+  "description": "Simple authentication proxy using JWT",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Sebastian Peyrott",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "http-proxy": "^1.11.1",
+    "jsonwebtoken": "^5.0.5"
+  }
+}
