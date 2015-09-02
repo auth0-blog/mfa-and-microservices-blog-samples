@@ -1,0 +1,17 @@
+{
+  "name": "microservice-1",
+  "version": "1.0.0",
+  "description": "Sample microservice, queries \"tickets\"",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^4.13.3",
+    "mongoose": "^4.1.5",
+    "morgan": "^1.6.1",
+    "winston": "^1.0.1"
+  }
+}
