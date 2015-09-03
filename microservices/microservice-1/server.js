@@ -4,20 +4,6 @@ var http = require('http');
 var mongoose = require('mongoose');
 var logger = require('./logger');
 
-mongoose.connect('mongodb://localhost/test');
-
-// Our ticket sample schema
-var Ticket = mongoose.model('Ticket', {
-    id: Number,
-    status: String,
-    title: String,
-    userInitials: String,
-    assignedTo: String,
-    shortDescription: String,
-    description: String,
-    replies: [{ user: String, message: String }]
-});
-
 var app = express();
 app.use(
     //Log requests
@@ -25,6 +11,37 @@ app.use(
         stream: logger.stream 
     })
 );
+
+var Ticket;
+app.use(function(req, res, next) {    
+    if(!Ticket || mongoose.connection.readyState !== 1) {
+        //Database not connected
+        mongoose.connect(process.env.MONGO_URL,
+            function(err) {
+                if(err) {
+                    logger.error(err);
+                    res.sendStatus(500);
+                    return;
+                }
+                
+                Ticket = mongoose.model('Ticket', {
+                    id: Number,
+                    status: String,
+                    title: String,
+                    userInitials: String,
+                    assignedTo: String,
+                    shortDescription: String,
+                    description: String,
+                    replies: [{ user: String, message: String }]
+                });
+                
+                next();
+            }
+        );       
+    } else {
+        next();
+    }    
+});
 
 app.get('/tickets', function(req, res, next) {
     Ticket.find({}, function(err, result) {
@@ -41,8 +58,7 @@ var port = process.env.PORT || 3001;
 http.createServer(app).listen(port, function (err) {
   if (err) {
     logger.error(err);
-  }
-  else {
+  } else {
     logger.info('Listening on http://localhost:' + port);
   }
 });
