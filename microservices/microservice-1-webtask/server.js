@@ -2,46 +2,52 @@ var webtask = require('webtask-tools');
 var express = require('express');
 var morgan = require('morgan');
 var mongoose = require('mongoose');
-
-// Our ticket sample schema
-var Ticket = mongoose.model('Ticket', {
-    id: Number,
-    status: String,
-    title: String,
-    userInitials: String,
-    assignedTo: String,
-    shortDescription: String,
-    description: String,
-    replies: [{ user: String, message: String }]
-});
-
-var connected = false;
-function connectOnce(url) {
-    if(connected) {
-        return;
-    }
-    mongoose.connect(url);
-    connected = true;
-}
+var logger = require('./logger');
 
 var app = express();
 app.use(
     //Log requests
     morgan(':method :url :status :response-time ms - :res[content-length]', { 
-        stream: {
-            write: function(message, encoding) {
-                console.log("DEBUG: " + message.replace(/\n$/, ''));
-            }
-        }
+        stream: logger.stream 
     })
 );
 
-app.get('/tickets', function(req, res, next) {
-    connectOnce(req.webtaskContext.data.MONGO_URL);
+var Ticket;
+app.use(function(req, res, next) {    
+    if(!Ticket || mongoose.connection.readyState !== 1) {
+        //Database not connected
+        mongoose.connect(process.env.MONGO_URL ||
+                         req.webtaskContext.data.MONGO_URL,
+            function(err) {
+                if(err) {
+                    logger.error(err);
+                    res.sendStatus(500);
+                    return;
+                }
+                
+                Ticket = mongoose.model('Ticket', {
+                    id: Number,
+                    status: String,
+                    title: String,
+                    userInitials: String,
+                    assignedTo: String,
+                    shortDescription: String,
+                    description: String,
+                    replies: [{ user: String, message: String }]
+                });
+                
+                next();
+            }
+        );       
+    } else {
+        next();
+    }    
+});
 
+app.get('/tickets', function(req, res, next) {
     Ticket.find({}, function(err, result) {
         if(err) {
-            console.log("ERROR: " + err);
+            logger.error(err);
             res.sendStatus(500);
             return;
         } 
