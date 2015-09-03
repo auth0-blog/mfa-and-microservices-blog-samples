@@ -56,6 +56,6 @@ app.get('/tickets', function(req, res, next) {
 });
 
 //Express to webtask adapter
-module.exports = webtask.fromExpress(app);
+module.exports = require('webtask-tools').fromExpress(app);
 
 
