@@ -36,7 +36,8 @@ if(process.env.MONGO_URL) {
 app.use(function(req, res, next) {    
     if(!Ticket || mongoose.connection.readyState !== 1) {
         //Database not connected
-        mongoose.connect(process.env.MONGO_URL,
+        mongoose.connect(process.env.MONGO_URL ||
+                         req.webtaskContext.data.MONGO_URL,
             function(err) {
                 if(err) {
                     logger.error(err);
