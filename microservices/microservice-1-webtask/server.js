@@ -12,12 +12,31 @@ app.use(
     })
 );
 
+//Mongoose ticket model
 var Ticket;
+
+function createModels() {
+    Ticket = mongoose.model('Ticket', {
+        id: Number,
+        status: String,
+        title: String,
+        userInitials: String,
+        assignedTo: String,
+        shortDescription: String,
+        description: String,
+        replies: [{ user: String, message: String }]
+    });    
+}
+
+if(process.env.MONGO_URL) {
+    mongoose.connect(process.env.MONGO_URL);
+    createModels();
+}
+
 app.use(function(req, res, next) {    
     if(!Ticket || mongoose.connection.readyState !== 1) {
         //Database not connected
-        mongoose.connect(process.env.MONGO_URL ||
-                         req.webtaskContext.data.MONGO_URL,
+        mongoose.connect(process.env.MONGO_URL,
             function(err) {
                 if(err) {
                     logger.error(err);
@@ -25,16 +44,7 @@ app.use(function(req, res, next) {
                     return;
                 }
                 
-                Ticket = mongoose.model('Ticket', {
-                    id: Number,
-                    status: String,
-                    title: String,
-                    userInitials: String,
-                    assignedTo: String,
-                    shortDescription: String,
-                    description: String,
-                    replies: [{ user: String, message: String }]
-                });
+                createModels();
                 
                 next();
             }
