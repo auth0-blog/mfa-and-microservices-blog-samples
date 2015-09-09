@@ -9,6 +9,8 @@
   "author": "",
   "license": "UNLICENSED",
   "dependencies": {
+    "amqp": "^0.2.4",
+    "amqp-winston": "^1.0.7",
     "http-proxy": "^1.11.2",
     "jsonwebtoken": "^5.0.5",
     "mongoose": "^4.1.5",
