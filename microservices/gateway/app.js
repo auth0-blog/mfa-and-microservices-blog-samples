@@ -48,17 +48,17 @@ function toBase64(obj) {
 
 var amqpConn = amqp.createConnection({url: amqpHost});
 
-var userDb = mongoose.connect(process.env.USER_DB_URL || '');
-var servicesDb = mongoose.connect(process.env.SERVICES_DB_URL || '');
+var userDb = mongoose.createConnection(process.env.USER_DB_URL || '');
+var servicesDb = mongoose.createConnection(process.env.SERVICES_DB_URL || '');
 
 // Mongoose user model
-var User = userDb.model('User', new Schema ({
+var User = userDb.model('User', new mongoose.Schema ({
     username: String,
     password: String,
     roles: [ String ]
 }));
 
-var Service = servicesDb.model('Service', new Schema ({
+var Service = servicesDb.model('Service', new mongoose.Schema ({
     name: String,
     url: String,
     endpoints: [ {
@@ -266,11 +266,16 @@ function amqpPromise(req, endpoint) {
     return result.promise;
 }
 
+function roleCheck(user, service) {
+    var intersection = _.intersection(user.roles, service.authorizedRoles);
+    return intersection.length === service.authorizedRoles.length;
+}
+
 function serviceDispatch(req, res) {
     var parsedUrl = url.parse(req.url);
     
     Service.findOne({ url: parsedUrl.pathname }, function(err, service) {
-        var authorized = checkAccess(service, req.context.authPayload);
+        var authorized = roleCheck(req.context.authPayload.user, service);
         if(!authorized) {
             send401(res);
             return;
@@ -279,17 +284,17 @@ function serviceDispatch(req, res) {
         // Fanout all requests to all related endpoints. 
         // Results are aggregated (more complex strategies are possible).
         var promises = [];
-        service.endpoints.forEach(function(endpoint) {
+        service.endpoints.forEach(function(endpoint) {    
             switch(endpoint.type) {
                 case 'http':
-                    promises.push(httpPromise(req, endpoint));
+                    promises.push(httpPromise(req, endpoint.url));
                     break;
                 case 'amqp':
-                    promises.push(amqpPromise(req, endpoint));
+                    promises.push(amqpPromise(req, endpoint.url));
                     break;
                 default:
                     logger.error('Unknown endpoint type: ' + endpoint.type);
-            }
+            }            
         });
         
         //Agreggation strategy for multiple endpoints.
