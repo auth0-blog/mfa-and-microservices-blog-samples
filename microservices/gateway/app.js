@@ -76,10 +76,41 @@ function send401(res) {
     res.end();
 }
 
+function getData(req) {
+    var result = Q.defer();
+    
+    //For simplicity
+    if(req.method !== 'POST') {
+        result.reject('Unsupported HTTP method: ' + req.method);
+        return result.promise;
+    }
+    
+    var data = "";
+    req.on('data', function(data_) {
+        data += data_;
+        if(data.length >= (1024 * 1024)) {
+            data = "";
+            result.reject("Bad request");
+        }
+    });
+    
+    req.on('end', function() {
+        if(result.promise.isPending()) {
+            try {
+                result.resolve(data);
+            } catch(err) {
+                result.reject(err.toString());
+            }
+        }
+    });
+    
+    return result.promise;
+}
+
 function doLogin(req, res) {
-    req.on('data', function(chunk) {
+    getData(req).then(function(data) { 
         try {
-            var loginData = JSON.parse(chunk);
+            var loginData = JSON.parse(data);
             User.findOne({ username: loginData.username }, function(err, user) { 
                 if(err) {
                     logger.error(err);
@@ -107,6 +138,9 @@ function doLogin(req, res) {
             logger.error(err);            
             send401(res);
         }
+    }, function(err) {
+        logger.error(err);            
+        send401(res);
     });
 }
 
@@ -178,37 +212,6 @@ function httpSend(oldReq, endpoint, data, deferred) {
 
     req.write(data);
     req.end();
-}
-
-function getData(req) {
-    var result = Q.defer();
-    
-    //For simplicity
-    if(req.method !== 'POST') {
-        result.reject('Unsupported HTTP method: ' + req.method);
-        return result.promise;
-    }
-    
-    var data = "";
-    req.on('data', function(data_) {
-        data += data_;
-        if(data.length >= (1024 * 1024)) {
-            data = "";
-            result.reject("Bad request");
-        }
-    });
-    
-    req.on('end', function() {
-        if(result.promise.isPending()) {
-            try {
-                result.resolve(data);
-            } catch(err) {
-                result.reject(err.toString());
-            }
-        }
-    });
-    
-    return result.promise;
 }
 
 function httpPromise(req, endpoint) {
