@@ -3,7 +3,7 @@ var url = require('url');
 var jwt = require('jsonwebtoken');
 var mongoose = require('mongoose');
 var winston = require('winston');
-require('winston-amqp');
+var winstonAmqp = require('winston-amqp');
 var morgan = require('morgan');
 var sprintf = require('sprintf');
 var Q = require('q');
@@ -19,11 +19,11 @@ var logger = new winston.Logger({
         new winston.transports.Console({
             timestamp: true,
             level: process.env.GATEWAY_LOG_LEVEL || 'debug',
-            handleExceptions: true,
+            handleExceptions: false,
             json: false,
             colorize: true
         }),
-        new winston.transports.AMQP({
+        new winstonAmqp.AMQP({
             name: 'gateway',
             level: process.env.GATEWAY_LOG_LEVEL || 'debug',
             host: amqpHost,
