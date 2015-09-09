@@ -133,7 +133,7 @@ function doLogin(req, res) {
                 } else {
                     send401(res);
                 }
-            });
+            }, 'users');
         } catch(err) {
             logger.error(err);            
             send401(res);
@@ -161,7 +161,6 @@ function validateAuth(data, callback) {
         var payload = jwt.verify(token, secretKey);
         // Custom validation logic, in this case we just check that the 
         // user exists
-        var user = users[payload.sub];
         User.findOne({ username: payload.sub }, function(err, user) {
             if(err) {
                 logger.error(err);
@@ -315,7 +314,7 @@ function serviceDispatch(req, res) {
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify(responseData));
         });
-    });
+    }, 'services');
 }
 
 var server = http.createServer(function(req, res) {
@@ -337,7 +336,9 @@ var server = http.createServer(function(req, res) {
         
         // We keep the authentication payload to pass it to 
         // microservices decoded.
-        req.context.authPayload = authPayload;
+        req.context = {
+            authPayload: authPayload
+        };
         
         serviceDispatch(req, res);        
     });
