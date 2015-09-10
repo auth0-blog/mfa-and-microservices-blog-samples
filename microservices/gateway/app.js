@@ -61,10 +61,10 @@ var User = userDb.model('User', new mongoose.Schema ({
 var Service = servicesDb.model('Service', new mongoose.Schema ({
     name: String,
     url: String,
-    endpoints: [ {
+    endpoints: [ new mongoose.Schema({
         type: String,
         url: String
-    } ],
+    }) ],
     authorizedRoles: [ String ]
 }));
 
@@ -76,14 +76,13 @@ function send401(res) {
     res.end();
 }
 
+function send500(res) {
+    res.statusCode = 500;
+    res.end();
+}
+
 function getData(req) {
     var result = Q.defer();
-    
-    //For simplicity
-    if(req.method !== 'POST') {
-        result.reject('Unsupported HTTP method: ' + req.method);
-        return result.promise;
-    }
     
     var data = "";
     req.on('data', function(data_) {
@@ -177,15 +176,15 @@ function validateAuth(data, callback) {
     }
 }
 
-function httpSend(oldReq, endpoint, data, deferred) {
+function httpSend(oldReq, endpoint, data, deferred, isGet) {
     var parsedEndpoint = url.parse(endpoint);
 
     var options = {
         hostname: parsedEndpoint.hostname,
         port: parsedEndpoint.port,
         path: parsedEndpoint.path,
-        method: 'POST',
-        headers: {
+        method: isGet ? 'GET' : 'POST',
+        headers: isGet ? {} : {
             'Content-Type': 'application/json',
             'Content-Length': data.length
         }
@@ -197,7 +196,16 @@ function httpSend(oldReq, endpoint, data, deferred) {
             resData += chunk;
         });
         res.on('end', function() {
-            deferred.resolve(resData);
+            try {
+                var json = JSON.parse(resData);
+                deferred.resolve(json);
+            } catch(err) {
+                deferred.reject({
+                    req: oldReq, 
+                    endpoint: endpoint, 
+                    message: 'Invalid data format: ' + err.toString()
+                });
+            }
         });
     });
 
@@ -209,11 +217,13 @@ function httpSend(oldReq, endpoint, data, deferred) {
         });
     });
 
-    req.write(data);
+    if(!isGet && data) {
+        req.write(data);
+    }
     req.end();
 }
 
-function httpPromise(req, endpoint) {
+function httpPromise(req, endpoint, isGet) {
     var result = Q.defer();
     
     function reject(msg) {
@@ -224,11 +234,15 @@ function httpPromise(req, endpoint) {
         });
     }
     
-    getData(req).then(function(data) {
-        httpSend(req, endpoint, data, result);
-    }, function(err) {
-        reject(err);
-    });
+    if(isGet) {
+        httpSend(req, endpoint, null, result, isGet);
+    } else {
+        getData(req).then(function(data) {
+            httpSend(req, endpoint, data, result, isGet);
+        }, function(err) {
+            reject(err);
+        });
+    }
     
     return result.promise;
 }
@@ -242,7 +256,17 @@ function amqpSend(req, endpoint, data, result) {
         queue.subscribe({ ack: true, prefetchCount: 1 }, 
             function(message, headers, deliveryInfo, messageObject) {
                 messageObject.acknowledge();
-                result.resolve(message);
+                
+                try {
+                    var json = JSON.parse(message);
+                    deferred.resolve(json);
+                } catch(err) {
+                    deferred.reject({
+                        req: req, 
+                        endpoint: endpoint, 
+                        message: 'Invalid data format: ' + err.toString()
+                    });
+                }               
             }
         );
     });
@@ -277,19 +301,31 @@ function serviceDispatch(req, res) {
     var parsedUrl = url.parse(req.url);
     
     Service.findOne({ url: parsedUrl.pathname }, function(err, service) {
+        if(err) {
+            logger.error(err);
+            send500(res);
+            return;
+        }
+    
         var authorized = roleCheck(req.context.authPayload.user, service);
         if(!authorized) {
             send401(res);
             return;
-        }
+        }       
         
         // Fanout all requests to all related endpoints. 
         // Results are aggregated (more complex strategies are possible).
         var promises = [];
-        service.endpoints.forEach(function(endpoint) {    
+        service.endpoints.forEach(function(endpoint) {   
+            logger.debug(sprintf('Dispatching request from public endpoint ' + 
+                '%s to internal endpoint %s (%s)', 
+                req.url, endpoint.url, endpoint.type));
+                         
             switch(endpoint.type) {
-                case 'http':
-                    promises.push(httpPromise(req, endpoint.url));
+                case 'http-get':
+                case 'http-post':
+                    promises.push(httpPromise(req, endpoint.url, 
+                        endpoint.type === 'http-get'));
                     break;
                 case 'amqp':
                     promises.push(amqpPromise(req, endpoint.url));
