@@ -2,43 +2,15 @@ var http = require('http');
 var url = require('url');
 var jwt = require('jsonwebtoken');
 var mongoose = require('mongoose');
-var winston = require('winston');
-var winstonAmqp = require('winston-amqp');
 var morgan = require('morgan');
 var sprintf = require('sprintf');
 var Q = require('q');
 var _ = require('underscore');
 var amqp = require('amqp');
 
+var logger = require('./logger');
+
 var amqpHost = process.env.AMQP_HOST || 'amqp://gateway:gateway@127.0.0.1:5672';
-
-// Logging
-winston.emitErrs = true;
-var logger = new winston.Logger({
-    transports: [
-        new winston.transports.Console({
-            timestamp: true,
-            level: process.env.GATEWAY_LOG_LEVEL || 'debug',
-            handleExceptions: false,
-            json: false,
-            colorize: true
-        }),
-        new winstonAmqp.AMQP({
-            name: 'gateway',
-            level: process.env.GATEWAY_LOG_LEVEL || 'debug',
-            host: amqpHost,
-            exchange: 'log',
-            routingKey: 'gateway'
-        })
-    ],
-    exitOnError: false
-});
-
-logger.stream = {
-    write: function(message, encoding) {
-        logger.debug(message.replace(/\n$/, ''));
-    }
-};
 
 var httpLogger = morgan('combined', { stream: logger.stream });
 
