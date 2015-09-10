@@ -53,6 +53,7 @@ function send500(res) {
     res.end();
 }
 
+/* Get all pending data from HTTP request */
 function getData(req) {
     var result = Q.defer();
     
@@ -78,6 +79,9 @@ function getData(req) {
     return result.promise;
 }
 
+/*
+ * Simple login: returns a JWT if login data is valid.
+ */
 function doLogin(req, res) {
     getData(req).then(function(data) { 
         try {
@@ -115,6 +119,9 @@ function doLogin(req, res) {
     });
 }
 
+/*
+ * Authentication validation using JWT. Strategy: find existing user.
+ */
 function validateAuth(data, callback) {
     if(!data) {
         callback(null);
@@ -148,6 +155,9 @@ function validateAuth(data, callback) {
     }
 }
 
+/*
+ * Internal HTTP request, auth data is passed in headers.
+ */
 function httpSend(oldReq, endpoint, data, deferred, isGet) {
     var parsedEndpoint = url.parse(endpoint);
 
@@ -158,7 +168,8 @@ function httpSend(oldReq, endpoint, data, deferred, isGet) {
         method: isGet ? 'GET' : 'POST',
         headers: isGet ? {} : {
             'Content-Type': 'application/json',
-            'Content-Length': data.length
+            'Content-Length': data.length,
+            'GatewayAuth': toBase64(oldReq.authPayload)
         }
     };
 
@@ -195,6 +206,9 @@ function httpSend(oldReq, endpoint, data, deferred, isGet) {
     req.end();
 }
 
+/* 
+ * Internal HTTP request
+ */
 function httpPromise(req, endpoint, isGet) {
     var result = Q.defer();
     
@@ -241,10 +255,35 @@ function amqpSend(req, endpoint, data, result) {
                 }               
             }
         );
+        
+        //Default exchange
+        var exchange = amqpConn.exchange();
+        //Send data
+        exchange.publish(endpoint, data ? data : {}, {
+            headers: {
+                'GatewayAuth': toBase64(req.authPayload),                
+            },
+            deliveryMode: 1, //non-persistent
+            replyTo: queue.name,
+            mandatory: true,
+            immediate: true
+        }, function(err) {
+            if(err) {
+                deferred.reject({
+                    req: req, 
+                    endpoint: endpoint, 
+                    message: 'Could not publish message to the default ' + 
+                             'AMQP exchange'
+                });
+            }
+        });
     });
 }
 
-function amqpPromise(req, endpoint) {
+/* 
+ * Internal AMQP request
+ */
+function amqpPromise(req, endpoint, isGet) {
     var result = Q.defer();
     
     function reject(msg) {
@@ -255,11 +294,15 @@ function amqpPromise(req, endpoint) {
         });
     }
     
-    getData(req).then(function(data) {
-        amqpSend(req, endpoint, data, result);
-    }, function(err) {
-        reject(err);
-    });
+    if(req.method === 'POST') {
+        getData(req).then(function(data) {
+            amqpSend(req, endpoint, data, result);
+        }, function(err) {
+            reject(err);
+        });        
+    } else {
+        amqpSend(req, endpoint, null, result);
+    }
     
     return result.promise;
 }
@@ -269,6 +312,10 @@ function roleCheck(user, service) {
     return intersection.length === service.authorizedRoles.length;
 }
 
+/* 
+ * Parses the request and dispatches multiple concurrent requests to each
+ * internal endpoint. Results are aggregated and returned.
+ */
 function serviceDispatch(req, res) {
     var parsedUrl = url.parse(req.url);
     
