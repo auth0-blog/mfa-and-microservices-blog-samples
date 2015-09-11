@@ -354,7 +354,7 @@ function serviceDispatch(req, res) {
             }            
         });
         
-        //Agreggation strategy for multiple endpoints.
+        //Aggregation strategy for multiple endpoints.
         Q.allSettled(promises).then(function(results) {
             var responseData = {};
         
