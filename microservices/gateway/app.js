@@ -20,8 +20,10 @@ function toBase64(obj) {
 
 var amqpConn = amqp.createConnection({url: amqpHost});
 
-var userDb = mongoose.createConnection(process.env.USER_DB_URL || '');
-var servicesDb = mongoose.createConnection(process.env.SERVICES_DB_URL || '');
+var userDb = mongoose.createConnection(process.env.USER_DB_URL || 
+                'mongodb://guest:guest@localhost:21017/test/users');
+var servicesDb = mongoose.createConnection(process.env.SERVICES_DB_URL || 
+                'mongodb://guest:guest@localhost:21017/test/services');
 
 // Mongoose user model
 var User = userDb.model('User', new mongoose.Schema ({
